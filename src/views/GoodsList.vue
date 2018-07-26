@@ -1,10 +1,804 @@
 <template>
+  <div>
+    <Header></Header>
+    <nav-bread><span>列表页</span></nav-bread>
+    <symbol id="icon-arrow-short" viewBox="0 0 25 32">
+      <title>arrow-short</title>
+      <path class="path1" d="M24.487 18.922l-1.948-1.948-8.904 8.904v-25.878h-2.783v25.878l-8.904-8.904-1.948 1.948 12.243 12.243z"></path>
+    </symbol>
 
+    <div class="accessory-result-page accessory-page">
+      <div class="container">
+        <div class="filter-nav">
+          <span class="sortby">Sort by:</span>
+          <a href="javascript:void(0)" class="default cur">Default</a>
+          <a href="javascript:void(0)" class="price" @click="sortGoods()">Price
+            <svg class="icon icon-arrow-short" :class="{'sort-up':!sortFlag}">
+              <use xlink:href="#icon-arrow-short"></use>
+            </svg>
+          </a>
+          <a href="javascript:void(0)" class="filterby stopPop" @click='showFilterPop'>Filter by</a>
+        </div>
+        <div class="accessory-result">
+          <!-- filter -->
+          <div class="filter stopPop" id="filter" :class="{'filterby-show':filterBy }">
+            <dl class="filter-price">
+              <dt>Price:</dt>
+              <dd>
+                <a href="javascript:void(0)" @click="setPriceFilter('all')" :class="{'cur': priceChecked === 'all'}">All</a>
+              </dd>
+              <dd v-for="(price,index) in priceFiter" :key='index' >
+                <a href="javascript:void(0)" @click='setPriceFilter(index)' :class="{'cur':priceChecked===index}">{{price.startPrice}} - {{price.endPrice}}</a>
+              </dd>
+
+            </dl>
+          </div>
+
+          <!-- search result accessories list -->
+          <div class="accessory-list-wrap">
+            <div class="accessory-list col-4">
+              <div class="accessory-list col-4">
+                <ul>
+                  <li v-for="(item,index) in goodsList" :key='index'>
+                    <div class="pic">
+                      <a href="#"><img v-lazy="'static/'+item.productImage" alt=""></a>
+                    </div>
+                    <div class="main">
+                      <div class="name">{{item.productName}}</div>
+                      <div class="price">{{item.salePrice}}</div>
+                      <div class="btn-area">
+                        <a href="javascript:;" class="btn btn--m" @click="addCart(item.productId)">加入购物车</a>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+
+              </div>
+              <!-- load more -->
+              <div class="view-more-normal"
+                   v-infinite-scroll="loadMore"
+                   infinite-scroll-disabled="busy"
+                   infinite-scroll-distance="20">
+                <img src="./../assets/loading-spinning-bubbles.svg" v-show="loading">
+                <!-- 加载中 -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="md-overlay" v-show="overLayFlag" @click='closePop'></div>
+    <Footer></Footer>
+    <modal v-bind:mdShow="mdShow" v-on:close="closeModal">
+          <p slot="message">
+             请先登录,否则无法加入到购物车中!
+          </p>
+          <div slot="btnGroup">
+              <a class="btn btn--m" href="javascript:;" @click="mdShow = false">关闭</a>
+          </div>
+      </modal>
+      <modal v-bind:mdShow="mdShowCart" v-on:close="closeModal">
+        <p slot="message">
+          <svg class="icon-status-ok">
+            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#icon-status-ok"></use>
+          </svg>
+          <span>加入购物车成!</span>
+        </p>
+        <div slot="btnGroup">
+          <a class="btn btn--m" href="javascript:;" @click="mdShowCart = false">继续购物</a>
+          <router-link class="btn btn--m btn--red" href="javascript:;" to="/cart">查看购物车</router-link>
+        </div>
+      </modal>
+  </div>
 </template>
 <script>
-export default {
+import axios from 'axios'
 
+import Header from '@/components/header'
+import Footer from '@/components/footer'
+import NavBread from '@/components/navBread'
+import Modal from '@/components/Modal'
+export default {
+  data() {
+    return {
+      goodsList: [],
+      sortFlag: true,
+      page: 1,
+      pageSize: 8,
+      busy: true,
+      loading: false,
+      mdShow: false,
+      mdShowCart: false,
+      priceFiter: [{
+        startPrice: '0.00',
+        endPrice: '500.00'
+      }, {
+        startPrice: '500.00',
+        endPrice: '1000.00'
+      },
+      {
+        startPrice: '1000.00',
+        endPrice: '2000.00'
+      }],
+      priceChecked: 'all',
+      filterBy: false,
+      overLayFlag: false
+
+    }
+  },
+  mounted() {
+    this.getGoodsList()
+  },
+  components: {
+    Header,
+    Footer,
+    NavBread,
+    Modal
+  },
+  methods: {
+    getGoodsList(flag) {
+      const param = {
+        page: this.page,
+        pageSize: this.pageSize,
+        sort: this.sortFlag ? 1 : -1,
+        priceLevel: this.priceChecked
+      };
+      this.loading = true
+      axios.get('/goods/list', {
+        params: param
+      }).then((response) => {
+        const res = response.data
+        this.loading = false
+        if (res.status === '0') {
+          if (flag) {
+            this.goodsList = this.goodsList.concat(res.result.list)
+            if (res.result.count === 0) {
+              this.busy = true
+            } else {
+              this.busy = false
+            }
+          } else {
+            this.goodsList = res.result.list
+            this.busy = false
+          }
+        } else {
+          this.goodsList = []
+        }
+      })
+    },
+    loadMore() {
+      this.busy = true;
+      setTimeout(() => {
+        this.page = this.page + 1
+        this.getGoodsList(true)
+      }, 500);
+    },
+    addCart(productId) {
+      axios.post('/goods/addCart', {
+        productId
+      }).then((response) => {
+        const res = response.data
+        if (res.status === '0') {
+          this.mdShowCart = true
+          // todo
+        } else {
+          this.mdShow = true
+        }
+      })
+    },
+    sortGoods() {
+      this.sortFlag = !this.sortFlag
+      this.page = 1
+      this.getGoodsList()
+    },
+    showFilterPop() {
+      this.filterBy = true
+      this.overLayFlag = true
+    },
+    closePop() {
+      this.filterBy = false
+      this.overLayFlag = false
+    },
+    setPriceFilter(index) {
+      this.priceChecked = index
+      this.closePop()
+      this.getGoodsList();
+    },
+    closeModal(){
+      this.mdShow = false;
+      this.mdShowCart = false;
+    },
+  }
 }
+
 </script>
 <style lang="less" scoped>
+.sort-up {
+  transform: rotate(180deg);
+  transition: all 1 ease-out
+}
+
+
+.accessory-list > ul:after {
+  visibility: hidden;
+  display: block;
+  content: " ";
+  clear: both;
+}
+
+.accessory-list > ul > li {
+  float: left;
+  width: 23.80952%;
+  margin-right: 1.5873%;
+  margin-bottom: 1.5873%;
+  background: #fff;
+  border: 2px solid #e9e9e9;
+  -webkit-transition: all .5s ease-out;
+  transition: all .5s ease-out;
+}
+
+.accessory-list > ul > li:hover {
+  border-color: #ee7a23;
+  -webkit-transform: translateY(-5px);
+  -ms-transform: translateY(-5px);
+  transform: translateY(-5px);
+  -webkit-box-shadow: 0 0 10px #999;
+  box-shadow: 0 0 10px #999;
+  -webkit-transition: all .5s ease-out;
+  transition: all .5s ease-out;
+}
+
+.accessory-list.col-4 > ul > li {
+  width: 23.80952%;
+  margin-right: 1.5873%;
+  margin-bottom: 1.5873%;
+}
+
+.accessory-list.col-4 > ul > li:nth-child(4n) {
+  margin-right: 0;
+}
+
+.accessory-list.col-5 > ul > li {
+  width: 18.73016%;
+  margin-right: 1.5873%;
+  margin-bottom: 1.5873%;
+}
+
+.accessory-list.col-5 > ul > li:nth-child(5n) {
+  margin-right: 0;
+}
+
+.accessory-list .pic {
+  overflow: hidden;
+}
+
+.accessory-list .pic a {
+  display: block;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%;
+}
+
+.accessory-list .pic img {
+  width: 100%;
+}
+
+.accessory-list .main {
+  padding: 20px 10px 10px 10px;
+}
+
+.accessory-list .main .name {
+  height: 4em;
+  line-height: 1.25em;
+  padding-bottom: 10px;
+  font-family: "moderat", sans-serif;
+  font-weight: bold;
+  overflow: hidden;
+}
+
+.accessory-list .main .price {
+  float: left;
+  line-height: 30px;
+  color: #d1434a;
+  font-size: 1.25em;
+}
+
+.accessory-list .main .quantity {
+  float: right;
+}
+
+.accessory-list .main .btn-area {
+  clear: both;
+  padding-top: 10px;
+}
+
+.accessory-list .main .btn-area .btn {
+  width: 100%;
+}
+
+@media only screen and (max-width: 991px) {
+  .accessory-list.col-4 > ul > li {
+    width: 32.27513%;
+    margin-right: 1.5873%;
+    margin-bottom: 1.5873%;
+  }
+
+  .accessory-list.col-4 > ul > li:nth-child(4n) {
+    margin-right: 1.5873%;
+  }
+
+  .accessory-list.col-4 > ul > li:nth-child(3n) {
+    margin-right: 0;
+  }
+
+  .accessory-list.col-5 > ul > li {
+    width: 23.80952%;
+    margin-right: 1.5873%;
+    margin-bottom: 1.5873%;
+  }
+
+  .accessory-list.col-5 > ul > li:nth-child(5n) {
+    margin-right: 20px;
+  }
+
+  .accessory-list.col-5 > ul > li:nth-child(4n) {
+    margin-right: 0;
+  }
+
+  .accessory-list .main .name {
+    font-size: 1.3rem;
+  }
+
+  .accessory-list .main .btn-area .btn {
+    font-size: 1.2rem;
+  }
+}
+
+@media only screen and (max-width: 767px) {
+  .accessory-list {
+    font-size: 1.2rem;
+  }
+
+  .accessory-list.col-4 > ul > li, .accessory-list.col-5 > ul > li {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: none;
+    border-top: 1px solid #e9e9e9;
+    border-bottom: 1px solid #e9e9e9;
+  }
+
+  .accessory-list.col-4 > ul > li:hover, .accessory-list.col-5 > ul > li:hover {
+    border-color: none;
+    -webkit-transform: none;
+    -ms-transform: none;
+    transform: none;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    -webkit-transition: none .5s ease-out;
+    transition: none .5s ease-out;
+  }
+
+  .accessory-list .pic {
+    float: left;
+    width: 110px;
+    height: 110px;
+    border: 1px solid #e9e9e9;
+  }
+
+  .accessory-list .pic a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding-bottom: 0;
+  }
+
+  .accessory-list .main {
+    padding: 0 0 0 125px;
+  }
+
+  .accessory-list .main:after {
+    visibility: hidden;
+    display: block;
+    content: " ";
+    clear: both;
+  }
+
+  .accessory-list .main .price {
+    float: none;
+  }
+
+  .accessory-list .main .quantity {
+    float: left;
+  }
+
+  .accessory-list .main .name {
+    height: auto;
+    min-height: 50px;
+  }
+
+  .accessory-list .main .btn-area {
+    padding: 0;
+    clear: none;
+    float: right;
+  }
+
+  .accessory-list .main .btn-area .btn {
+    height: 30px;
+    line-height: 30px;
+    padding-left: .8em;
+    padding-right: .8em;
+    font-size: 1rem;
+    letter-spacing: .1em;
+  }
+}
+
+.filter {
+  width: 230px;
+  padding: 0 20px 0 20px;
+  color: #605F5F;
+  -webkit-transition: right .5s ease-out;
+  transition: right .5s ease-out;
+}
+
+.filter dl {
+  min-height: 180px;
+  margin-bottom: 50px;
+}
+
+.filter dt {
+  margin-bottom: 30px;
+  font-family: "moderat", sans-serif;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.filter dd {
+  line-height: 1.2em;
+  margin: 20px 0;
+}
+
+.filter dd a {
+  display: block;
+  padding: 5px 0;
+  -webkit-transition: padding-left .3s ease-out;
+  transition: padding-left .3s ease-out;
+}
+
+.filter dd a:hover, .filter dd .cur {
+  color: #ee7a23;
+}
+
+.filter .filter-category ul {
+  display: none;
+  padding-left: 20px;
+}
+
+.filter .filter-category li {
+  line-height: 1.2em;
+  margin: 10px 0;
+}
+
+.filter .filter-category ul > li > ul {
+  margin-bottom: 20px;
+}
+
+.filter .filter-category ul > li > ul .icon-arrow-down {
+  display: none;
+}
+
+.filter .filter-category a:hover .icon-arrow-down {
+  fill: #ee7a23;
+  -webkit-transition: -webkit-transform .3s ease-out;
+  transition: -webkit-transform .3s ease-out;
+  transition: transform .3s ease-out;
+  transition: transform .3s ease-out, -webkit-transform .3s ease-out;
+}
+
+.filter .filter-category .icon-arrow-down {
+  width: 11px;
+  height: 11px;
+  fill: #605F5F;
+  vertical-align: middle;
+  margin-left: 3px;
+  -webkit-transition: -webkit-transform .3s ease-out;
+  transition: -webkit-transform .3s ease-out;
+  transition: transform .3s ease-out;
+  transition: transform .3s ease-out, -webkit-transform .3s ease-out;
+}
+
+.filter .filter-category .open ~ ul {
+  display: block;
+}
+
+.filter .filter-category .open .icon-arrow-down {
+  -webkit-transform: rotate(180deg);
+  -ms-transform: rotate(180deg);
+  transform: rotate(180deg);
+}
+
+.filter .filter-price dd a:hover, .filter .filter-price dd .cur {
+  -webkit-transition: padding-left .3s ease-out;
+  transition: padding-left .3s ease-out;
+  border-left: 2px solid #ee7a23;
+  padding-left: 15px;
+}
+
+.filter .filter-price dd .cur {
+  font-weight: bold;
+}
+
+.filter.filterby-show {
+  right: 0;
+  -webkit-transition: right .5s ease-out;
+  transition: right .5s ease-out;
+}
+
+@media only screen and (max-width: 767px) {
+  .filter {
+    position: fixed;
+    right: -230px;
+    top: 0;
+    z-index: 201;
+    height: 100%;
+    background: #fff;
+    padding: 0;
+    margin: 0;
+    overflow: auto;
+  }
+
+  .filter dl {
+    min-height: 0;
+    margin: 0;
+  }
+
+  .filter dt {
+    background: #f0f0f0;
+    height: 55px;
+    line-height: 55px;
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  .filter dd {
+    margin: 0;
+  }
+
+  .filter dd a {
+    padding: 12px 10px 12px 15px;
+    border-bottom: 1px solid #e9e9e9;
+  }
+
+  .filter dd li {
+    margin: 0;
+  }
+
+  .filter .filter-category ul {
+    padding-left: 0;
+  }
+
+  .filter .filter-category ul li > a {
+    padding-left: 30px;
+  }
+
+  .filter .filter-category ul li > ul a {
+    padding-left: 45px;
+  }
+
+  .filter .filter-category .icon-arrow-down {
+    float: right;
+  }
+}
+
+/** search resule **/
+/** 搜索结果页 **/
+.search-result-wrap {
+  background: #f0f0f0;
+}
+
+.search-result-wrap .search-result-num {
+  padding: 10px 0;
+  line-height: 25px;
+}
+
+.search-result-wrap .search-result-num strong {
+  color: #d1434a;
+}
+
+.accessory-result {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+.accessory-result .filter {
+  margin-right: 25px;
+}
+
+.accessory-result .accessory-list-wrap {
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  -ms-flex: 1;
+  flex: 1;
+}
+
+.filter-nav {
+  height: 55px;
+  line-height: 55px;
+  margin: 60px 0 30px 0;
+  padding: 0 20px;
+  background: #fff;
+  text-align: right;
+  overflow: hidden;
+}
+
+.filter-nav a {
+  margin: 0 10px;
+}
+
+.filter-nav a.cur, .filter-nav a:hover {
+  color: #ee7a23;
+}
+
+.filter-nav .sort-up .icon-arrow-short {
+  -webkit-transform: rotate(180deg);
+  -ms-transform: rotate(180deg);
+  transform: rotate(180deg);
+}
+
+.filter-nav .filterby {
+  display: none;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+@media only screen and (max-width: 767px) {
+  .search-result-wrap {
+    background: none;
+    padding: 0 10px;
+  }
+
+  .filter-nav {
+    margin: 0;
+    padding: 0 10px;
+    background: #f0f0f0;
+    border-top: 1px solid #e9e9e9;
+    text-align: left;
+  }
+
+  .filter-nav:after {
+    visibility: hidden;
+    display: block;
+    content: " ";
+    clear: both;
+  }
+
+  .filter-nav a {
+    float: left;
+  }
+
+  .filter-nav .filterby {
+    display: block;
+    float: right;
+  }
+
+  .filter-nav .sortby {
+    display: none;
+  }
+
+  .accessory-result .filter {
+    margin: 0;
+  }
+}
+
+.icon-arrow-short {
+  width: 11px;
+  height: 11px;
+  transition: all .3s ease-out
+}
+
+.page-title-accessory {
+  display: none;
+}
+
+.accessory-title:after {
+  visibility: hidden;
+  display: block;
+  content: " ";
+  clear: both;
+}
+
+.accessory-title h2 {
+  float: left;
+}
+
+.accessory-title .accessory-more-link {
+  float: right;
+  line-height: 30px;
+}
+
+.accessory-title .accessory-more-link .icon-arrow-short {
+  margin-left: 15px;
+  -webkit-transform: rotate(-90deg);
+  -ms-transform: rotate(-90deg);
+  transform: rotate(-90deg);
+}
+
+.accessory-title .accessory-more-link:hover {
+  color: #ee7a23;
+}
+
+.accessory-title .accessory-more-link:hover .icon-arrow-short {
+  fill: #ee7a23;
+}
+
+.accessory-classify {
+  position: relative;
+}
+
+.accessory-result-page .view-more-normal {
+  height: 120px;
+  margin-top: 40px;
+}
+
+.accessory-result-page .view-more-normal .view-more-btn {
+  top: 0;
+  padding-top: 40px;
+}
+
+@media only screen and (max-width: 767px) {
+  .page-title-accessory {
+    display: block;
+  }
+
+  .accessory-classify {
+    padding-bottom: 55px;
+  }
+
+  .accessory-title {
+    padding-left: 10px;
+    padding-right: 10px;
+    border: none;
+  }
+
+  .accessory-title .accessory-more-link {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    width: 100%;
+    height: 45px;
+    line-height: 45px;
+    background: #fff;
+    border-top: 1px solid #e9e9e9;
+    border-bottom: 1px solid #e9e9e9;
+  }
+
+  .accessory-result-page {
+    font-size: 1.2rem;
+  }
+
+  .accessory-result-page .btn-wrap {
+    margin: 0;
+  }
+
+  .accessory-result-page .btn-wrap .btn {
+    /*line-height: 1.2em;*/
+    white-space: normal;
+  }
+
+  .accessory-result-page .view-more-normal {
+    height: 60px;
+    margin-top: 10px;
+  }
+
+  .accessory-result-page .view-more-normal .view-more-btn {
+    top: 0;
+    padding-top: 20px;
+  }
+}
+
+
 </style>

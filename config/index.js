@@ -10,10 +10,33 @@ module.exports = {
     // Paths
     assetsSubDirectory: 'static',
     assetsPublicPath: '/',
-    proxyTable: {},
+    proxyTable: {
+      '/goods':{
+          target:'http://localhost:3000',
+          changeOrigin: true,
+      },
+      '/goods/*':{
+        target:'http://localhost:3000',
+        changeOrigin: true,
+      },
+      // '/users/*':{
+      //   target:'http://localhost:3000',
+      //   changeOrigin: true,
+      // },
+      '/users/*': {
+        target: 'http://localhost:3000', // 接口的域名
+        // secure: false,  // 如果是https接口，需要配置这个参数
+        changeOrigin: true, // 如果接口跨域，需要进行这个参数配置
+        // pathRewrite: {
+        //   '^/api': ''
+        // }
+      }
+    },
 
     // Various Dev Server settings
-    host: 'localhost', // can be overwritten by process.env.HOST
+    host: '172.16.180.233',
+    // host: 'localhost',
+    // can be overwritten by process.env.HOST
     port: 8080, // can be overwritten by process.env.PORT, if port is in use, a free one will be determined
     autoOpenBrowser: false,
     errorOverlay: true,
@@ -23,7 +46,7 @@ module.exports = {
     // Use Eslint Loader?
     // If true, your code will be linted during bundling and
     // linting errors and warnings will be shown in the console.
-    useEslint: true,
+    useEslint: false,
     // If true, eslint errors and warnings will also be shown in the error overlay
     // in the browser.
     showEslintErrorsInOverlay: false,
